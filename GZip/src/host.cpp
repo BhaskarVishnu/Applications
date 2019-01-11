@@ -65,23 +65,20 @@ void process_file(std::string & inFile_name, xil_gzip& gzip) {
         exit(1);
     }
 
-    inFile.seekg(0, inFile.end);
-    long input_size = inFile.tellg();
-    inFile.seekg(0, inFile.beg);   
-    inFile.close();
-    
     // GZip encoding
     string gzip_encode_in  = inFile_name;
     string gzip_encode_out = inFile_name;
     gzip_encode_out =  gzip_encode_out + ".xil.gz";
-    uint32_t enbytes = gzip.compress_file(gzip_encode_in, gzip_encode_out);
+    gzip.compress_file(gzip_encode_in, gzip_encode_out);
 
-    display_stats(inFile_name, input_size, enbytes, 0, 0);    
+    std::cout << "\n\n********************************************************" << std::endl;
+    std::cout << "* GZIP Finished Successfully " << std::endl; 
+    std::cout << "********************************************************\n" << std::endl;
 }
 
 
 // Process Batch of Files (-l, -b Options)
-void process_batch(std::string & filelist, std::string & batch, xil_gzip & gzip) {
+void process_batch(std::string & filelist, xil_gzip & gzip) {
     
     int total_files = 0;
     std::string line; 
@@ -110,25 +107,19 @@ void process_batch(std::string & filelist, std::string & batch, xil_gzip & gzip)
         inFile.close();
     }
     
-    // Find out the size of batch
-    int batch_size = 0;
-    if(!batch.empty()) {
-        // Figure out user provided batch count
-        batch_size = atoi(batch.c_str());
-    }
-    else 
-        batch_size = 0;
-
-    // If -b is 0, process all the files in batch mode
-    if(batch_size == 0)
-        batch_size = total_files;
-
+    int batch_size = 1;
+    std::cout << "\nGenerating CRC32 in CPU" << std::endl;
     std::vector<std::string> gzip_encode_in;  
     std::vector<std::string> gzip_encode_out;  
     std::vector<int> enbytes;  
+    std::cout << "\n\n";
 
     for(int i = 0; i < total_files; i+=batch_size) {
-    
+        std::cout << "*******************************************************" << std::endl;
+        std::cout << "Input File: " << std::setprecision(2) << 
+                            (float)in_file_size[i]/1000000 << 
+                            " MB\t" << input_file_names[i] << std::endl;
+ 
         int chunk_size = batch_size;
         
         if(i + batch_size > total_files)
@@ -152,8 +143,7 @@ void process_batch(std::string & filelist, std::string & batch, xil_gzip & gzip)
             std::string gzip_cmp = gzip_encode_in[k];
             gzip_cmp = gzip_cmp + ".xil.gz";
             std::string gzip_dec = gzip_encode_in[k] + ".xil";
-            gzip_cmd_encode = "gzip -dc " + gzip_cmp + " 1> " + gzip_dec + " 2> error";
-            
+            gzip_cmd_encode = "gzip -d " + gzip_cmp;
             system(gzip_cmd_encode.c_str());
 
             // Validate results
@@ -161,10 +151,11 @@ void process_batch(std::string & filelist, std::string & batch, xil_gzip & gzip)
 
             // Delete Compressed and Decompressed Files
             if (ret == 0) {
+                std::cout << "Output File: " << std::setprecision(2) 
+                                << (float)enbytes[i]/1000000 
+                                << " MB\t" << gzip_cmp << std::endl;
                 std::string val_del;
                 val_del = "rm " + gzip_dec;
-                system(val_del.c_str());
-                val_del = "rm " + gzip_cmp;
                 system(val_del.c_str());
             }
             else {
@@ -172,45 +163,54 @@ void process_batch(std::string & filelist, std::string & batch, xil_gzip & gzip)
                 gzip.release();
                 exit(1);
             }
-           
-            std::cout << "\t\t\t";    
-            display_stats(gzip_encode_in[k], in_file_size[i + k], enbytes[i + k], ret, 1);
         }
         
        gzip_encode_in.resize(0);
        gzip_encode_out.resize(0);
     }
-
+    std::cout << "\n\n********************************************************" << std::endl;
+    std::cout << "* GZIP Finished Successfully " << std::endl; 
+    std::cout << "********************************************************\n" << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
     std::string binaryFileName = "gZip_app";
+
+    std::cout << "\n"; 
+    std::cout << "********************************************************" << std::endl;
+    std::cout << "* Starting gzip hardware accelerated application" << std::endl;
+    std::cout << "********************************************************" << std::endl;
+    std::cout << "\n\n"; 
     
     sda::utils::CmdLineParser parser;
     parser.addSwitch("--input_file",    "-i",     "Input Data File",        "");
     parser.addSwitch("--file_list",    "-l",      "\tList of Input Files",    "");
-    parser.addSwitch("--batch",        "-b",      "\tParallel Batch Size <Default 4>",    "");
+    parser.addSwitch("--device",    "-d",      "\tDevice Number",    "0");   // default to device 0 if not specificied
     parser.parse(argc, argv);
  
-    // Create XGZip Object 
-    // OpenCL Initialization     
-    xil_gzip gzip;
-    gzip.init(binaryFileName);
-    
     std::string infile      = parser.value("input_file");   
     std::string filelist    = parser.value("file_list");   
-    std::string batch       = parser.value("batch");   
-    
+	unsigned int device_num = parser.value_to_int("device");
+   
+    bool file_list = false;
+        if (!filelist.empty())
+            file_list = true;
+  
+    int file_size = 0;
+    // Create XGZip Object 
+    // OpenCL Initialization    
+    xil_gzip gzip;
+    if (file_list)
+        file_size = gzip.get_file_size(filelist, file_list);
+    else
+        file_size = gzip.get_file_size(infile, file_list);
+    if (gzip.init(binaryFileName, file_size, device_num) != 0)
+		exit(EXIT_FAILURE);
+
     if (!filelist.empty()) {
-        std::cout<<"\n";
-        std::cout<<"Batch\t\tThroughput\t\tGZip_CR\t\tSTATUS\t\tFile Size(MB)\t\tFile Name"<<std::endl;
-        std::cout<<"\n";
-        process_batch(filelist,batch,gzip);
+        process_batch(filelist,gzip);
     }else if (!infile.empty()){
-        std::cout<<"\n";
-        std::cout<<"KT(MBps)\tGZip_CR\t\tSTATUS\t\tFile Size(MB)\t\tFile Name"<<std::endl;
-        std::cout<<"\n";
         process_file(infile,gzip);   
     }  else{
         parser.printHelp();

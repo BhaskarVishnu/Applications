@@ -36,7 +36,8 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "defns.h"
 
 // Fixed Maximum Input Size
-#define MAX_INPUT_SIZE 1024*1024*100 // 100MB
+#define KB 1024u
+#define MAX_INPUT_SIZE KB*1024*1024 // 1GB
 
 
 int validate(std::string & inFile_name, std::string & outFile_name);
@@ -44,10 +45,13 @@ int validate(std::string & inFile_name, std::string & outFile_name);
 class xil_gzip {
     public:
         // Device Configuration Process
-        int init(const std::string& binaryFile);
+        int init(const std::string& binaryFile, int input_size, unsigned int device_num);
         
         // Release OpenCL Parameters
         int release();
+
+        // Get file size
+        int get_file_size(std::string& inFile, bool list);
 
         // Input: Input File Buffer       <Single File Mode>
         //        Actual Input Size
@@ -56,7 +60,7 @@ class xil_gzip {
 
         // Input: Input File Name
         // Output: Compressed Stream Size
-        uint32_t compress_file(std::string & inFile_name, std::string & outFile_name); 
+        void compress_file(std::string & inFile_name, std::string & outFile_name); 
 
         // Input:  Input File Names       <Batch File Mode>
         // Output: Output File Names 
