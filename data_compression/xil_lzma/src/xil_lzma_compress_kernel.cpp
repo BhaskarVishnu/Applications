@@ -61,11 +61,22 @@
 #define LZ_MAX_OFFSET_LIMIT 0x40000000
 #define MAX_MATCH_LEN 255
 #define OFFSET_WINDOW 0x40000000
-#define MATCH_LEN 12 
-#define MATCH_LEVEL 4 
+#define MATCH_LEN 27 
+typedef ap_uint<VEC * BIT> uintV_t;
+typedef ap_uint<MATCH_LEN * BIT> uintMatchV_t;
+#define MATCH_LEVEL 2 
+#define DICT_ELE_WIDTH (MATCH_LEN*BIT + 40)//32)//24)
 
+typedef ap_uint<DICT_ELE_WIDTH> uintDict_t;
+typedef ap_uint< MATCH_LEVEL * DICT_ELE_WIDTH> uintDictV_t;
+
+#define OUT_BYTES (4) 
+typedef ap_uint< OUT_BYTES * BIT> uintOut_t;
+typedef ap_uint< 2  * OUT_BYTES * BIT> uintDoubleOut_t;
 typedef ap_uint<GMEM_DWIDTH> uint512_t;
-typedef ap_uint<64> compressd_dt;
+typedef ap_uint<72> compressd_dt;
+typedef ap_uint<VEC*32> compressdV_dt;
+typedef ap_uint<64> lzma_compressd_dt;
 
 #if (C_COMPUTE_UNIT == 1)
 namespace cu1
@@ -88,7 +99,7 @@ void lzma_core(
         uint32_t core_idx,
         hls::stream<uint512_t> &outStream512,
         hls::stream<uint16_t> &outStream512Size,
-        uint32_t last_index
+        uint64_t last_index
         )
 {
     uint32_t left_bytes = 0;
@@ -98,7 +109,6 @@ void lzma_core(
     hls::stream<compressd_dt>      crImprover965to987Stream("crImprover965to987Stream");
 
     hls::stream<compressd_dt>      boosterStream("boosterStream");
-    hls::stream<compressd_dt>      filterStream("filterStream");
     hls::stream<uint16_t>           compOutSize("compOutSize");
 	
     hls::stream<ap_uint<512> >           packStream("packStream");
@@ -123,7 +133,6 @@ void lzma_core(
     #pragma HLS STREAM variable=crImprover959to999Stream    depth=c_gmem_burst_size
     #pragma HLS STREAM variable=crImprover965to987Stream    depth=c_gmem_burst_size
     #pragma HLS STREAM variable=boosterStream        depth=c_gmem_burst_size
-    #pragma HLS STREAM variable=filterStream        depth=c_gmem_burst_size
     #pragma HLS STREAM variable=compOutSize          depth=c_gmem_burst_size
     #pragma HLS STREAM variable=rcStream             depth=c_gmem_burst_size
     #pragma HLS STREAM variable=rcOutSize            depth=c_gmem_burst_size
@@ -147,7 +156,6 @@ void lzma_core(
     #pragma HLS RESOURCE variable=inStream            core=FIFO_SRL
     #pragma HLS RESOURCE variable=compressdStream     core=FIFO_SRL
     #pragma HLS RESOURCE variable=boosterStream       core=FIFO_SRL
-    #pragma HLS RESOURCE variable=filterStream       core=FIFO_SRL
     #pragma HLS RESOURCE variable=crImprover959to999Stream       core=FIFO_SRL
     #pragma HLS RESOURCE variable=crImprover965to987Stream       core=FIFO_SRL
     #pragma HLS RESOURCE variable=compOutSize         core=FIFO_SRL
@@ -174,11 +182,10 @@ void lzma_core(
     lz_compress<MATCH_LEN,MATCH_LEVEL,LZ_DICT_SIZE,BIT,MIN_OFFSET,MIN_MATCH,LZ_MAX_OFFSET_LIMIT>(inStream,compressdStream,dict_buff1,/*dict_buff2,dict_buff3,*/input_size,left_bytes,last_index);
     lz_cr_improve_959to999<MATCH_LEN, OFFSET_WINDOW>(compressdStream, crImprover959to999Stream, input_size, left_bytes);
     lz_cr_improve_965to987<MATCH_LEN, OFFSET_WINDOW>(crImprover959to999Stream, crImprover965to987Stream, input_size, left_bytes);
-    lz_booster_999to11109<MAX_MATCH_LEN, OFFSET_WINDOW, MATCH_LEN>(crImprover965to987Stream, boosterStream,input_size,left_bytes);
-    //lz_booster_999to11<MAX_MATCH_LEN, OFFSET_WINDOW, MATCH_LEN>(crImprover965to987Stream, boosterStream,input_size,left_bytes,compOutSize);
-    lz_filter(boosterStream, filterStream, input_size,left_bytes,compOutSize);
+    lz_booster_999to11<MAX_MATCH_LEN, OFFSET_WINDOW, MATCH_LEN>(crImprover965to987Stream, boosterStream,input_size,left_bytes,compOutSize);
+    //lz_filter(compressdStream, boosterStream,input_size,left_bytes,compOutSize);
 
-    lzma_rc_1(filterStream,compOutSize, symStream64,probsStream64,outStreamSize64, input_size,last_index);
+    lzma_rc_1(boosterStream,compOutSize, symStream64,probsStream64,outStreamSize64, input_size,last_index);
     //lzma_rc_1_1(boosterStream,compOutSize, packStream,packsizeStream, input_size,last_index);
     //lzma_rc_1_2(packStream,packsizeStream,symStream64,probsStream64,outStreamSize64);
     lzma_rc_converter(symStream64,probsStream64,outStreamSize64,symStream,probsStream,outStreamSize);
@@ -198,7 +205,7 @@ void lzma(
                 const uint32_t  input_size[PARALLEL_BLOCK],
                 uint32_t        output_size[PARALLEL_BLOCK],
                 uint32_t        max_lit_limit[PARALLEL_BLOCK],
-                uint32_t last_index
+                uint64_t last_index
                 )
 {
     hls::stream<uint512_t>   inStream512[PARALLEL_BLOCK];
@@ -255,7 +262,7 @@ void xil_lzma_cu4
                 uint32_t        *in_block_size,
                 uint32_t block_size_in_kb,
                 uint32_t input_size,
-                uint32_t dataprocessed          
+                uint64_t dataprocessed
                 )
 {
     #pragma HLS INTERFACE m_axi port=in offset=slave bundle=gmem0
@@ -276,7 +283,7 @@ void xil_lzma_cu4
     #pragma HLS INTERFACE s_axilite port=input_size bundle=control
     #pragma HLS INTERFACE s_axilite port=return bundle=control
     #pragma HLS INTERFACE s_axilite port=dataprocessed bundle=control
-
+    
     #pragma HLS data_pack variable=in
     #pragma HLS data_pack variable=out
     #pragma HLS data_pack variable=dict_buff1
@@ -319,7 +326,7 @@ void xil_lzma_cu4
 		}
 	}
 */
-    uint32_t last_index = 0;
+    uint64_t last_index = 0;
     for (int i = 0; i < no_blocks; i+=PARALLEL_BLOCK) {
         int nblocks = PARALLEL_BLOCK;
         if((i + PARALLEL_BLOCK) > no_blocks) {

@@ -22,9 +22,19 @@ uint64_t xlzma_bound(uint64_t input_size) {
 // #define XLZMA_FAILED_UNKNOWN -1
 // #define XLZMA_FAILED_INPUT_TOO_LARGE -2
 // #define XLZMA_FAILED_OUTPUT_TOO_SMALL -3
-uint64_t xlzma_compress(int xlzma_handle, char* input, uint64_t input_size, char* output, uint64_t output_buf_size) {
+int64_t xlzma_compress(int xlzma_handle, char* input, uint64_t input_size, char* output, uint64_t output_buf_size) {
     return lzma::getinstance()->xlzma_compress(xlzma_handle,input,input_size,output,output_buf_size);
 }
+
+// compress all the bytes in the buffer, finish the LZMA compression, and write it into the output buffer
+// return the encoded length if succeeded, return an ERROR code otherwise, for example
+// #define XLZMA_FAILED_UNKNOWN -1
+// #define XLZMA_FAILED_INPUT_TOO_LARGE -2
+// #define XLZMA_FAILED_OUTPUT_TOO_SMALL -3
+int64_t xlzma_finish(int xlzma_handle, char* input, uint64_t input_size, char* output, uint64_t output_buf_size) {
+    return lzma::getinstance()->xlzma_finish(xlzma_handle,input,input_size,output,output_buf_size);
+}
+
 
 // close the xlzma stream
 // return 0 if succeeded, -1 otherwise

@@ -38,7 +38,7 @@
 #include <stdint.h>
 #include "fastpos.h"
 #include "common.h"
-typedef ap_uint<64> compressd_dt;
+typedef ap_uint<72> compressd_dt;
 typedef ap_uint<11> probability;
 
 #define	rc_literal_OFFSET		0
@@ -218,14 +218,14 @@ void lzma_rc_1 (
         hls::stream<ap_uint<1024> > &probsStream,
         hls::stream<uint16_t> &outStreamSize,
         uint32_t input_size,
-        uint32_t last_index
+        uint64_t last_index
 		) 
 {
     Range_Coder rc;
     uint32_t lc = 3;
     uint32_t pb = 2;
     uint32_t lp = 0;
-    uint32_t rcposition = last_index;
+    uint64_t rcposition = last_index;
     initrc(&rc,lc,pb,lp);
     uint32_t len = 1;
     #pragma HLS ARRAY_PARTITION variable=rc.reps complete
@@ -271,9 +271,9 @@ void lzma_rc_1 (
 
         uint8_t   tstr	   		= inValue.range(7,0);
         uint8_t   tLen     		= inValue.range(15,8);
-        uint32_t tOffset 		= inValue.range(47,16);
-        uint8_t tstr_prev 		= inValue.range(55,48);
-        uint8_t match_byte 		= inValue.range(63,56);
+        uint32_t tOffset 		= inValue.range(55,16);
+        uint8_t tstr_prev 		= inValue.range(63,56);
+        uint8_t match_byte 		= inValue.range(71,64);
 
         uint32_t pos_state = rcposition & rc.pos_mask;
         cadta = 0;
@@ -635,9 +635,9 @@ void lzma_rc_1_1 (
 
 		uint8_t   tstr	   		= inValue.range(7,0);
 		uint8_t   tLen     		= inValue.range(15,8);
-		uint32_t tOffset 		= inValue.range(47,16);
-		uint8_t tstr_prev 		= inValue.range(55,48);
-		uint8_t match_byte 		= inValue.range(63,56);
+		uint32_t tOffset 		= inValue.range(55,16);
+		uint8_t tstr_prev 		= inValue.range(63,56);
+		uint8_t match_byte 		= inValue.range(71,64);
 
 		//printf("[%.2x, %u, %u, %.2x, %.2x]\n", tstr,tLen,tOffset,tstr_prev,match_byte);
 
@@ -1276,9 +1276,6 @@ void lzma_rc_2 (
 {
     uint64_t rc_low = 0;
     uint32_t rc_range = 0xffffffff;
-    uint32_t temp_rc_range;
-    ap_uint<32> p;
-    probability prob;
     probability rc_allprobs[(LITERAL_CODERS_MAX*LITERAL_CODER_SIZE)	//rc_literal
                            +(STATES*POS_STATES_MAX)					//rc_is_match
                            +(STATES*POS_STATES_MAX)					//rc_is_rep0_long
@@ -1307,22 +1304,19 @@ void lzma_rc_2 (
         #pragma HLS dependence variable=rc_allprobs inter false
 
         ap_uint<8> symb = symStream.read();
-
-        if(symb == RC_BIT_0 || symb == RC_BIT_1){
-            p = probsStream.read();
-            prob = rc_allprobs[p];
-            temp_rc_range = (rc_range >> RC_BIT_MODEL_TOTAL_BITS)* prob; 
-        }
-
         switch (symb) {
         case RC_BIT_0: {
-            rc_range = temp_rc_range;
+            ap_uint<32> p = probsStream.read();
+            probability prob = rc_allprobs[p];
+            rc_range = (rc_range >> RC_BIT_MODEL_TOTAL_BITS)* prob;
             prob += (RC_BIT_MODEL_TOTAL - prob) >> RC_MOVE_BITS;
             rc_allprobs[p] = prob;
             break;
         }
         case RC_BIT_1: {
-            const uint32_t bound = temp_rc_range;
+            ap_uint<32> p = probsStream.read();
+            probability prob = rc_allprobs[p];
+            const uint32_t bound = prob * (rc_range >> RC_BIT_MODEL_TOTAL_BITS);
             rc_low += bound;
             rc_range -= bound;
             prob -= prob >> RC_MOVE_BITS;

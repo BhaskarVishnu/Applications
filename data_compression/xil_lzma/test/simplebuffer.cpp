@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
   rewind (fptr); 
   fread(src, sizeof(char), numbytes, fptr);
   fclose(fptr);
-  
+  snprintf(lzmaFilename, 256, "%s.xz", argv[1]); 
   const int src_size = numbytes;
   const int max_dst_size = xlzma_bound(src_size);
   printf("max_dst_size:%d\n",max_dst_size);
@@ -41,7 +41,17 @@ int main(int argc, char *argv[]) {
     run_screaming("Failed to allocate memory for *compressed_data.", 1);
   
   int handle = xlzma_init();
-  int compressed_data_size = xlzma_compress(handle,src,src_size, compressed_data ,max_dst_size);
+  int64_t compressed_data_size;
+  FILE* outFp;
+  
+  // First calling the xlzma_compress()
+  compressed_data_size = xlzma_compress(handle,src,src_size, compressed_data ,max_dst_size);
+  outFp = fopen(lzmaFilename, "wb");
+  fwrite(compressed_data, 1, compressed_data_size,outFp);
+  fclose(outFp);
+  
+  // Calling xlzma_finish() API
+  compressed_data_size = xlzma_finish(handle,src,src_size, compressed_data ,max_dst_size);
   // Check return_value to determine what happened.
   if (compressed_data_size < 0) {
     xlzma_close(handle);
@@ -52,13 +62,13 @@ int main(int argc, char *argv[]) {
     run_screaming("A result of 0 means compression worked, but was stopped because the destination buffer couldn't hold all the information.", 1);
   }
   if (compressed_data_size > 0)
-    printf("We successfully compressed some data:%u!\n",compressed_data_size);
+    printf("We successfully compressed some data:%lu!\n",compressed_data_size);
   // Not only does a positive return_value mean success, the value returned == the number of bytes required.
   // You can use this to realloc() *compress_data to free up memory, if desired.  We'll do so just to demonstrate the concept.
 
-  snprintf(lzmaFilename, 256, "%s.xz", argv[1]);
+  //snprintf(lzmaFilename, 256, "%s.xz", argv[1]);
   printf("C WRITING:%s\n",lzmaFilename);
-  FILE* outFp = fopen(lzmaFilename, "wb");
+  outFp = fopen(lzmaFilename, "ab");
   fwrite(compressed_data, 1, compressed_data_size,outFp);
   fclose(outFp);
   free(compressed_data);

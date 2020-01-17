@@ -21,7 +21,7 @@ Table below presents resource utilization of Xilinx LZMA compress
 
 | Design | LUT | LUTMEM | REG | BRAM | URAM| DSP | Fmax (MHz) |
 | --------------- | --- | ------ | --- | ---- | --- | -----| -----|
-| Compression     | 30441(3.02%) | 9036(1.58%)|47448(2.24%)|39(2.17%) | 0(0%)|3(0.04%)|250|
+| Compression     | 27181(2.69%) | 8977(1.57%)|36405(1.72%)|39(2.17%) | 0(0%)|4(0.06%)|250|
 
 
 ### Throughput & Compression Ratio

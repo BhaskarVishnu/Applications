@@ -64,7 +64,7 @@
 #define MAX_BSIZE_1024KB 0x100000
 #define MAX_BSIZE_4096KB 0x400000
 
-#define MEM_ALLOC_CPU (1024*1024*1024)
+#define MEM_ALLOC_CPU (4*1024*1024*1024)
 
 int validate(std::string & inFile_name, std::string & outFile_name);
 
@@ -90,6 +90,8 @@ typedef struct {
 	size_t h_compressed_size;
 }RECORD_LIST;
 
+enum STREAM_TAG { START = 1, MID = 2, END = 4 };
+
 class xil_lzma {
     public:
         int init(const std::string& binaryFile);
@@ -98,7 +100,7 @@ class xil_lzma {
         uint32_t compress(uint8_t *in, uint8_t *out, uint32_t actual_size,
 		                  uint32_t host_buffer_size,std::ofstream *ofs,int cu_run);
 	    uint64_t compress_file(std::string & inFile_name, std::string & outFile_name,int cu_run);
-        uint64_t compress_buffer(char* in,char* out,uint64_t input_size,uint64_t outsize,int cu); 
+        uint64_t compress_buffer(char* in,char* out,uint64_t input_size,uint64_t outsize,int cu,int stag); 
         uint64_t get_event_duration_ns(const cl::Event &event);
         void buffer_extension_assignments(int cu_run);
         // Binary flow compress/decompress        
@@ -109,7 +111,15 @@ class xil_lzma {
 
         // Switch between FPGA/Standard flows
         bool m_switch_flow;
- 
+        std::vector<RECORD_LIST> record_list;
+        uint64_t outIdx;
+        uint32_t lzblock;
+        uint32_t unlzblock;
+        uint64_t filesize;
+        //STREAM_TAG tag;
+        int tag;
+        uint64_t value64;
+
         xil_lzma();
         ~xil_lzma();
     private:

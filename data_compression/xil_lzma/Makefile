@@ -38,7 +38,7 @@ include $(COMMON_REPO)/xil_lzma/lz_compress/lz_compress.mk
 
 #LZMA Settings
 ################################################################################
-C_COMPUTE_UNITS:=1
+C_COMPUTE_UNITS:=4
 PARALLEL_BLOCK:=1
 SINGLE_XCLBIN:=false
 ################################################################################
