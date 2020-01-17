@@ -21,20 +21,22 @@ Table below presents resource utilization of Xilinx LZMA compress
 
 | Design | LUT | LUTMEM | REG | BRAM | URAM| DSP | Fmax (MHz) |
 | --------------- | --- | ------ | --- | ---- | --- | -----| -----|
-| Compression     | 27181(2.69%) | 8977(1.57%)|36405(1.72%)|39(2.17%) | 0(0%)|4(0.06%)|250|
+| Compression     | 29649(3.18%) | 9475(1.69%)|39869(1.98%)|39(2.17%) | 0(0%)|4(0.06%)|250|
 
 
 ### Throughput & Compression Ratio
 
-Table below presents the best throughput achieved during execution of this application.
+Table below presents the best compression ratio and throughput achieved during execution of this application.
 
-| Topic| Results| 
-|-------|--------|
-|Best Compression Throughput|27MB/s|
-|Average Compression Ratio Xilinx LZMA| 1.82x (Genomic data)|
-|Average Compression Ratio CPU LZMA| 2.07x (Genomic data)|
+| Topic| Command| Compression Ratio| Throughput(MBps)| 
+|-------|--------|-----------|--------------|
+|Xilinx LZMA (1 DDR bank)| ./xil_lzma_1b -c file_name | 2.47x | 27 |
+|Xilinx LZMA (4 DDR banks)| ./xil_lzma_1b -c file_name |2.60x | 26.4 |
+|CPU LZMA (Default)| xz file_name | 1.85x | 2.46 |
+|CPU LZMA (High Compression Level -9)| xz -9 file_name | 2.10x | 1.80 |
+|CPU LZMA (High Compression Level -9 with larger dictionary size)| xz -9 --lzma2="dict=1000000000" file_name | 3.25x | 1.43 |
 
-Note: This throughput is reported for buffer to buffer using one compute units. Overall throughput can still be increased with multiple compute units. 
+Note: Above results are for 18GB genomic file. Throughput is reported for buffer to buffer using one compute units. Overall throughput can still be increased with multiple compute units. 
 
 
 ## Software & Hardware
